@@ -138,7 +138,6 @@ import networkx.algorithms.dag as dag
 import networkx as nx
 import math
 
-# Comment to fix git?
 class Graph:
     """
     Computation Graph
@@ -300,10 +299,22 @@ class Graph:
         Returns:  The numeric value of of the indicated node.
 
         """
+        # If a feed_dict is not given then this will not cause the code to error
+        feed_dict = feed_dict if feed_dict != None else {}
 
-    # UNFINISHED!!
-    pass
+        # Iterate through every item in the feed_dict and set the vaue given the dict
+        for name, val in feed_dict.items():
+            self.nodes_by_name[name].value = val
+        
+        for node in self._ancestor_list(node) + [node]:
+            node._value = node.value
 
+        if compute_derivatives:
+            node._derivative = 1.0
+            for ancestor in reversed(self._ancestor_list(node) + [node]):
+                ancestor._derivative
+
+        return node.value
 
 # Construct a default computation graph.
 _GRAPH = Graph()
@@ -351,18 +362,18 @@ class Node:
 
         self.name = name
         _GRAPH._add_node(self)
+        self._value = None
+        self._derivative = 0.0
 
     @property
     def value(self):
         """ Value should be read-only (except for variable nodes). """
-        # UNFINISHED!!
-        return None
+        return self._value
 
     @property
     def derivative(self):
         """ derivative should be read-only. """
-        # UNFINISHED!!
-        return None
+        return self._derivative
 
     def __repr__(self):
         """ Default string representation is the Node's name. """
@@ -418,14 +429,17 @@ class Variable(Node):
             name: Variable name
         """
         super().__init__(name)
+        self._value = value
 
     def assign(self, value):
         """ Assign a new value to this variable
 
         """
-        # UNFINISHED!
-        pass
+        self._value = value
 
+    @property
+    def value(self):
+        return self._value
 
 class Constant(Node):
     """ Constants behave like Variables that cannot be assigned values
@@ -439,6 +453,10 @@ class Constant(Node):
     def __repr__(self):
         return self.name + ": " + str(self._value)
 
+    @property
+    def value(self):
+        return self._value
+
 
 class Placeholder(Node):
     """  Placeholders behave like Variables that can only be assigned values
@@ -449,6 +467,13 @@ class Placeholder(Node):
     def __init__(self, name=""):
         super().__init__(name)
 
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, val):
+        self._value = val
 
 # BINARY OPERATORS ---------------------
 
@@ -459,6 +484,9 @@ class Add(BinaryOp):
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
 
+    @property
+    def value(self):
+        return self.operand1.value + self.operand2.value
 
 class Subtract(BinaryOp):
     """ Subtraction.  Node representing operand1 - operand2. """
@@ -466,7 +494,10 @@ class Subtract(BinaryOp):
 
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
-
+    
+    @property
+    def value(self):
+        return self.operand1.value - self.operand2.value
 
 class Multiply(BinaryOp):
     """ Multiplication.  Node representing operand1 * operand2."""
@@ -475,6 +506,9 @@ class Multiply(BinaryOp):
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
 
+    @property
+    def value(self):
+        return self.operand1.value * self.operand2.value
 
 class Divide(BinaryOp):
     """ Division.  Node representing operand1 / operand2.  """
@@ -482,7 +516,10 @@ class Divide(BinaryOp):
 
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
-
+    
+    @property
+    def value(self):
+        return self.operand1.value / self.operand2.value
 
 # UNARY OPERATORS --------------------
 
@@ -500,6 +537,11 @@ class Pow(UnaryOp):
         """
 
         super().__init__(operand, name)
+        self.power = power
+    
+    @property
+    def value(self):
+        return self.operand.value ** self.power
 
 
 class Exp(UnaryOp):
@@ -510,6 +552,10 @@ class Exp(UnaryOp):
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
 
+    @property
+    def value(self):
+        return math.exp(self.operand.value)
+
 
 class Log(UnaryOp):
     """ Log base e. """
@@ -517,6 +563,10 @@ class Log(UnaryOp):
 
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
+    
+    @property
+    def value(self):
+        return math.log(self.operand.value)
 
 
 class Abs(UnaryOp):
@@ -525,6 +575,10 @@ class Abs(UnaryOp):
 
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
+    
+    @property
+    def value(self):
+        return abs(self.operand.value)
 
 
 def main():
