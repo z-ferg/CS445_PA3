@@ -306,18 +306,18 @@ class Graph:
         for name, val in feed_dict.items():
             self.nodes_by_name[name].value = val
 
-        for node in self._ancestor_list(node) + [node]:
-            node._value = node.value
+        for n in self._ancestor_list(node) + [node]:
+            n._value = n.value
 
         if compute_derivatives:
 
-            for node in self._graph.nodes:
-                node._derivative = 0.0
+            for n in self._graph.nodes:
+                n._derivative = 0.0
 
             node._derivative = 1.0
             for ancestor in reversed(self._ancestor_list(node) + [node]):
+                ancestor.backward()
                 ancestor._derivative = ancestor.derivative
-
         return node.value
 
 # Construct a default computation graph.
@@ -378,6 +378,9 @@ class Node:
     def derivative(self):
         """ derivative should be read-only. """
         return self._derivative
+    
+    def backward(self):
+        pass
 
     def __repr__(self):
         """ Default string representation is the Node's name. """
@@ -442,14 +445,6 @@ class Variable(Node):
         """
         self._value = value
 
-    @property
-    def value(self):
-        return self._value
-    
-    @property
-    def derivative(self):
-        return self._derivative
-
 class Constant(Node):
     """ Constants behave like Variables that cannot be assigned values
     after they are created. """
@@ -462,14 +457,6 @@ class Constant(Node):
 
     def __repr__(self):
         return self.name + ": " + str(self._value)
-
-    @property
-    def value(self):
-        return self._value
-    
-    @property
-    def derivative(self):
-        return self._derivative
 
 
 class Placeholder(Node):
@@ -510,11 +497,9 @@ class Add(BinaryOp):
     def value(self):
         return self.operand1.value + self.operand2.value
     
-    @property
-    def derivative(self):
+    def backward(self):
         self.operand1._derivative += self._derivative
         self.operand2._derivative += self._derivative
-        return self._derivative
 
 class Subtract(BinaryOp):
     """ Subtraction.  Node representing operand1 - operand2. """
@@ -527,12 +512,10 @@ class Subtract(BinaryOp):
     def value(self):
         return self.operand1.value - self.operand2.value
     
-    @property
-    def derivative(self):
+    def backward(self):
         self.operand1._derivative += self._derivative
         self.operand2._derivative -= self._derivative
-        return self._derivative
-
+        
 class Multiply(BinaryOp):
     """ Multiplication.  Node representing operand1 * operand2."""
     _COUNT = 0
@@ -544,11 +527,9 @@ class Multiply(BinaryOp):
     def value(self):
         return self.operand1.value * self.operand2.value
 
-    @property
-    def derivative(self):
+    def backward(self):
         self.operand1._derivative += self.operand2.value * self._derivative
         self.operand2._derivative += self.operand1.value * self._derivative
-        return self._derivative
 
 class Divide(BinaryOp):
     """ Division.  Node representing operand1 / operand2.  """
@@ -561,11 +542,10 @@ class Divide(BinaryOp):
     def value(self):
         return self.operand1.value / self.operand2.value
 
-    @property
-    def derivative(self):
+    def backward(self):
         self.operand1._derivative += (1 / self.operand2.value) * self._derivative
         self.operand2._derivative -= (self.operand1.value / (self.operand2.value ** 2)) * self._derivative
-        return self._derivative
+    
 
 # UNARY OPERATORS --------------------
 
@@ -589,10 +569,8 @@ class Pow(UnaryOp):
     def value(self):
         return self.operand.value ** self.power
     
-    @property
-    def derivative(self):
+    def backward(self):
         self.operand._derivative += (self.power * self.operand.value ** (self.power - 1)) * self._derivative
-        return self._derivative
 
 class Exp(UnaryOp):
     """ Exponential node:  e^operand
@@ -606,10 +584,8 @@ class Exp(UnaryOp):
     def value(self):
        return math.exp(self.operand.value)
     
-    @property
-    def derivative(self):
-        self.operand._derivative += math.exp(self.operand.value) * self.operand._derivative
-        return self._derivative
+    def backward(self):
+        self.operand._derivative += math.exp(self.operand.value) * self._derivative
 
 class Log(UnaryOp):
     """ Log base e. """
@@ -622,10 +598,8 @@ class Log(UnaryOp):
     def value(self):
         return math.log(self.operand.value)
 
-    @property
-    def derivative(self):
-        self.operand._derivative += (1 / self.operand.value) * self.operand._derivative
-        return self._derivative
+    def backward(self):
+        self.operand._derivative += (1 / self.operand.value) * self._derivative
 
 class Abs(UnaryOp):
     """ Absolute Value.  |operand| """
@@ -638,11 +612,9 @@ class Abs(UnaryOp):
     def value(self):
         return abs(self.operand.value)
     
-    @property
-    def derivative(self):
+    def backward(self):
         if self.operand.value > 0: self.operand._derivative += self._derivative
         elif self.operand.value < 0: self.operand._derivative -= self._derivative
-        return self._derivative
 
 
 def main():
