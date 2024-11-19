@@ -138,6 +138,7 @@ import networkx.algorithms.dag as dag
 import networkx as nx
 import math
 
+
 class Graph:
     """
     Computation Graph
@@ -300,25 +301,30 @@ class Graph:
 
         """
         # If a feed_dict is not given then this will not cause the code to error
-        feed_dict = feed_dict if feed_dict != None else {}
+        feed_dict = feed_dict if feed_dict is not None else {}
 
         # Iterate through every item in the feed_dict and set the vaue given the dict
         for name, val in feed_dict.items():
             self.nodes_by_name[name].value = val
 
+        # Set the value of each item leading to the required node
         for n in self._ancestor_list(node) + [node]:
-            n._value = n.value
+            n.forward()
 
+        # If true then do a backwards pass
         if compute_derivatives:
-
+            # Reset the derivatives from any previous runs
             for n in self._graph.nodes:
                 n._derivative = 0.0
 
+            # Set final node derivative to 1 to allow for non-0 calculations
             node._derivative = 1.0
+            
+            # Iterate through the reversed list taking the derivative at each
             for ancestor in reversed(self._ancestor_list(node) + [node]):
                 ancestor.backward()
-                ancestor._derivative = ancestor.derivative
         return node.value
+
 
 # Construct a default computation graph.
 _GRAPH = Graph()
@@ -379,7 +385,12 @@ class Node:
         """ derivative should be read-only. """
         return self._derivative
     
+    # Method to move through a backwards pass
     def backward(self):
+        pass
+    
+    # Method to move through a forwards pass
+    def forward(self):
         pass
 
     def __repr__(self):
@@ -445,6 +456,7 @@ class Variable(Node):
         """
         self._value = value
 
+
 class Constant(Node):
     """ Constants behave like Variables that cannot be assigned values
     after they are created. """
@@ -486,20 +498,21 @@ class Placeholder(Node):
 
 # BINARY OPERATORS ---------------------
 
+
 class Add(BinaryOp):
     """ Addition.  Node representing operand1 + operand2."""
     _COUNT = 0
 
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
-
-    @property
-    def value(self):
-        return self.operand1.value + self.operand2.value
+        
+    def forward(self):  # Set the value equal to the addition of both operands
+        self._value = self.operand1.value + self.operand2.value
     
-    def backward(self):
+    def backward(self):  # The derivative of both operands gets the derivative of this
         self.operand1._derivative += self._derivative
         self.operand2._derivative += self._derivative
+
 
 class Subtract(BinaryOp):
     """ Subtraction.  Node representing operand1 - operand2. """
@@ -508,13 +521,13 @@ class Subtract(BinaryOp):
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
     
-    @property
-    def value(self):
-        return self.operand1.value - self.operand2.value
+    def forward(self):
+        self._value = self.operand1.value - self.operand2.value
     
     def backward(self):
         self.operand1._derivative += self._derivative
         self.operand2._derivative -= self._derivative
+        
         
 class Multiply(BinaryOp):
     """ Multiplication.  Node representing operand1 * operand2."""
@@ -523,13 +536,13 @@ class Multiply(BinaryOp):
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
 
-    @property
-    def value(self):
-        return self.operand1.value * self.operand2.value
+    def forward(self):
+        self._value = self.operand1.value * self.operand2.value
 
     def backward(self):
         self.operand1._derivative += self.operand2.value * self._derivative
         self.operand2._derivative += self.operand1.value * self._derivative
+
 
 class Divide(BinaryOp):
     """ Division.  Node representing operand1 / operand2.  """
@@ -537,14 +550,14 @@ class Divide(BinaryOp):
 
     def __init__(self, operand1, operand2, name=""):
         super().__init__(operand1, operand2, name)
-    
-    @property
-    def value(self):
-        return self.operand1.value / self.operand2.value
+
+    def forward(self):
+        self._value = self.operand1.value / self.operand2.value
 
     def backward(self):
         self.operand1._derivative += (1 / self.operand2.value) * self._derivative
-        self.operand2._derivative -= (self.operand1.value / (self.operand2.value ** 2)) * self._derivative
+        self.operand2._derivative -= (self.operand1.value / 
+                                      (self.operand2.value ** 2)) * self._derivative
     
 
 # UNARY OPERATORS --------------------
@@ -565,12 +578,13 @@ class Pow(UnaryOp):
         super().__init__(operand, name)
         self.power = power
     
-    @property
-    def value(self):
-        return self.operand.value ** self.power
+    def forward(self):
+        self._value = self.operand.value ** self.power
     
     def backward(self):
-        self.operand._derivative += (self.power * self.operand.value ** (self.power - 1)) * self._derivative
+        self.operand._derivative += (self.power * self.operand.value ** 
+                                     (self.power - 1)) * self._derivative
+
 
 class Exp(UnaryOp):
     """ Exponential node:  e^operand
@@ -580,12 +594,12 @@ class Exp(UnaryOp):
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
 
-    @property
-    def value(self):
-       return math.exp(self.operand.value)
+    def forward(self):
+        self._value = math.exp(self.operand.value)
     
     def backward(self):
         self.operand._derivative += math.exp(self.operand.value) * self._derivative
+
 
 class Log(UnaryOp):
     """ Log base e. """
@@ -594,12 +608,12 @@ class Log(UnaryOp):
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
     
-    @property
-    def value(self):
-        return math.log(self.operand.value)
+    def forward(self):
+        self._value = math.log(self.operand.value)
 
     def backward(self):
         self.operand._derivative += (1 / self.operand.value) * self._derivative
+
 
 class Abs(UnaryOp):
     """ Absolute Value.  |operand| """
@@ -608,13 +622,14 @@ class Abs(UnaryOp):
     def __init__(self, operand, name=""):
         super().__init__(operand, name)
     
-    @property
-    def value(self):
-        return abs(self.operand.value)
+    def forward(self):
+        self._value = abs(self.operand.value)
     
     def backward(self):
-        if self.operand.value > 0: self.operand._derivative += self._derivative
-        elif self.operand.value < 0: self.operand._derivative -= self._derivative
+        if self.operand.value > 0: 
+            self.operand._derivative += self._derivative
+        elif self.operand.value < 0: 
+            self.operand._derivative -= self._derivative
 
 
 def main():
