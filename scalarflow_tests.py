@@ -439,7 +439,7 @@ class BackwardTestCase(unittest.TestCase):
 
     def test_add_backward(self):
         with sf.Graph() as g:
-            x = sf.Variable(1)
+            x = sf.Variable(1) 
             y = sf.Variable(2)
             total = sf.Add(x, y)
 
