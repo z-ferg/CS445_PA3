@@ -632,6 +632,19 @@ class Abs(UnaryOp):
             self.operand._derivative -= self._derivative
 
 
+class ReLU(UnaryOp):
+    _COUNT = 0
+
+    def __init__(self, operand, name=""):
+        super().__init__(operand, name)
+    
+    def forward(self):
+        self._value = max(0, self.operand.value)
+    
+    def backward(self):
+        self.operand._derivative += (1 if self.operand.value > 0 else 0) * self._derivative
+
+
 def main():
     pass
 

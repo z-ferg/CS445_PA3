@@ -3,6 +3,7 @@ Examples of running tf_classifers.
 """
 import numpy as np
 import sf_classifiers
+import matplotlib.pyplot as plt
 
 
 # ----------------------------------------------
@@ -65,19 +66,28 @@ def logistic_regression_clusters(lr=.05, epochs=100):
     classifier.plot_2d_predictions(dataset_train_x, dataset_train_y)
 
 
-def mlp_xor(lr=.05, epochs=100, activation='sigmoid'):
-    dataset_train_x, dataset_train_y = noisy_xor(500)
-    dataset_test_x, dataset_test_y = noisy_xor(500)
+def mlp_xor(lr=.01, epochs=50, activation='sigmoid'):
+    all_losses = []
+    for run in range(5):
+        dataset_train_x, dataset_train_y = noisy_xor(500)
+        dataset_test_x, dataset_test_y = noisy_xor(500)
 
-    classifier = sf_classifiers.MLP(2, [10], activation=activation)
+        classifier = sf_classifiers.MLP(2, [10, 10, 10, 10, 10], activation=activation)
 
-    classifier.train(dataset_train_x, dataset_train_y, epochs=epochs,
-                     learning_rate=lr)
+        losses = classifier.train(dataset_train_x, dataset_train_y, epochs=epochs,
+                        learning_rate=lr)
+        classifier.score(dataset_test_x, dataset_test_y)
+        all_losses.append(losses)
 
-    classifier.score(dataset_test_x, dataset_test_y)
-    classifier.plot_2d_predictions(dataset_train_x, dataset_train_y)
-
+    for losses in all_losses:
+        plt.plot(range(epochs), losses, label=f"Run {all_losses.index(losses) + 1}")
+    
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title(f"{activation.capitalize()} Activation Learning Curve")
+    plt.legend(loc="upper right")
+    plt.show()
 
 if __name__ == "__main__":
-    #mlp_xor()
-    logistic_regression_clusters()
+    mlp_xor()
+    #logistic_regression_clusters()

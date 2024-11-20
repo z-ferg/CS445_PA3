@@ -53,6 +53,7 @@ class AbstractSFClassifier(abc.ABC):
 
         """
         feed_dicts = sf_util.xy_to_feed_dicts(x, y)
+        epoch_losses = []
         for epoch in range(epochs):
             random.shuffle(feed_dicts)
 
@@ -66,8 +67,10 @@ class AbstractSFClassifier(abc.ABC):
                     param.assign(param.value - learning_rate * param.derivative)
 
             total_loss = sum(losses)
-
+            epoch_losses.append(total_loss)
             print("Epoch {} loss: {}".format(epoch, total_loss))
+        
+        return epoch_losses
 
     def score(self, x, y):
         """ Return the accuracy of this model on the provided dataset and
@@ -187,10 +190,9 @@ class MLP(AbstractSFClassifier):
 
                         if activation == 'sigmoid':
                             init_w = sf_util.glorot_init(prev_size, hidden_size)
-                        else:
+                        elif activation == 'relu':
                             # use sf_util.he_init
-                            raise ValueError("Unrecognized activation " +
-                                             activation)
+                            init_w = sf_util.he_init(prev_size)
 
                         cur_w_name = 'w_{}_{}_{}'.format(layer + 1, i, j)
                         cur_w = sf.Variable(init_w, name=cur_w_name)
@@ -199,9 +201,8 @@ class MLP(AbstractSFClassifier):
                     total = sf_util.cum_sum(products)
                     if activation == 'sigmoid':
                         cur_layer.append(sf_util.logistic(total))
-                    else:
-                        raise ValueError("Unrecognized activation " +
-                                         activation)
+                    elif activation == 'relu':
+                        cur_layer.append(sf.ReLU(total))
 
                 prev_layer = cur_layer
 
